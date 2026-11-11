@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Iris-3B · images in your browser</title>
+  <meta name="description" content="Iris-3B, a pixel-space text-to-image model with a four-step Turbo, a depth estimator and a four-times restorer, running on this device's CPU, compiled to WebAssembly with fusor-ai. Your prompts and photos never leave the page.">
+  <link rel="icon" href="/brand/iris.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/base.css">
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <App state="{{ App::new() }}">
+    <script type="module" src="./app.js"></script>
+    <main on:engine="state.receive(event)" data-phase="{{ state.phase.get().name() }}" data-loaded="{{ state.loaded.get().is_some() }}">
+      <header class="masthead">
+        <div class="lockup">
+          <img src="/brand/fusor-ai.svg" alt="fusor-ai" width="40" height="40">
+          <span class="times" aria-hidden="true">×</span>
+          <img src="/brand/iris.svg" alt="" width="36" height="36">
+          <span class="wordmark">Iris-3B</span>
+        </div>
+        <h1>Images, depth and restoration, rendered on your own CPU</h1>
+        <p class="lede">Iris-3B, speridlabs' open model that draws in pixels rather than latents, compiled to WebAssembly with fusor-ai, with Qwen3-VL reading the prompt. Describe an image and watch it form in four steps with Turbo or up to a hundred with the base model, estimate a photo's depth, or enlarge it four times. Once loaded, nothing you type or choose leaves the page.</p>
+      </header>
+
+      <If condition="{{ state.phase.get() == Phase::Loading }}">
+        <section class="card loading" aria-live="polite">
+          <div class="row"><strong>Loading the model</strong><span id="detail" class="muted">{{ state.detail.get() }}</span></div>
+          <progress max="1" value="{{ state.fraction.get() }}"></progress>
+        </section>
+      </If>
+
+      <If condition="{{ state.phase.get() == Phase::Broken }}">
+        <section class="card broken" role="alert">
+          <strong>{{ if state.failed_to_load() { "The model could not load" } else { "The engine stopped" } }}</strong>
+          <p id="detail">{{ state.detail.get() }}</p>
+          <If condition="{{ state.failed_to_load() }}">
+            <p class="muted">A bundle loads only into the runtime built with it. If you built this page yourself, rebuild both with <code>just ui</code>.</p>
+          </If>
+          <div class="row"><a id="reload" class="control primary" href="">Reload</a></div>
+        </section>
+      </If>
+
+      <section class="card compose">
+        <fieldset>
+          <legend>Mode</legend>
+          <div class="choices">
+            <ForEach items="{{ state.modes() }}" key="{{ |mode| mode.id.clone() }}">
+              <label class="choice"><input type="radio" name="mode" value="{{ item.get().id }}" disabled="{{ !state.can_choose_mode() }}" bind="state.mode.clone()"><span><strong>{{ item.get().label }}</strong><small>{{ item.get().detail }}</small></span></label>
+            </ForEach>
+          </div>
+        </fieldset>
+
+        <If condition="{{ state.reads_prompt() }}">
+          <label for="prompt">Prompt</label>
+          <textarea id="prompt" class="field" rows="3" maxlength="1000" bind="state.prompt"></textarea>
+
+          <If condition="{{ state.is_generate() }}">
+            <label for="negative">Negative prompt</label>
+            <textarea id="negative" class="field negative" rows="2" maxlength="2000" placeholder="What the image should not show" bind="state.negative"></textarea>
+          </If>
+
+          <fieldset>
+            <legend>Size</legend>
+            <div class="choices">
+              <ForEach items="{{ state.sizes() }}" key="{{ |size| size.id.clone() }}">
+                <label class="choice"><input type="radio" name="size" value="{{ item.get().id }}" bind="state.size.clone()"><span><strong>{{ item.get().label }}</strong><small>{{ item.get().detail }}</small></span></label>
+              </ForEach>
+            </div>
+          </fieldset>
+
+          <div class="knobs">
+            <If condition="{{ state.is_generate() }}">
+              <div class="knob">
+                <label for="steps">Steps <output>{{ format!("{}", state.steps.get()) }}</output></label>
+                <input id="steps" type="range" min="1" max="100" step="1" bind="state.steps">
+              </div>
+              <div class="knob">
+                <label for="guidance">Guidance <output>{{ format!("{:.1}", state.guidance.get()) }}</output></label>
+                <input id="guidance" type="range" min="1" max="10" step="0.5" bind="state.guidance">
+              </div>
+              <div class="knob">
+                <label for="shift">Shift <output>{{ format!("{:.1}", state.shift.get()) }}</output></label>
+                <input id="shift" type="range" min="1" max="8" step="0.5" bind="state.shift">
+              </div>
+            </If>
+            <div class="knob">
+              <label for="seed">Seed</label>
+              <input id="seed" class="field mono" type="text" inputmode="numeric" spellcheck="false" bind="state.seed">
+            </div>
+          </div>
+          <p id="estimate" class="muted">{{ state.estimate() }}</p>
+        </If>
+
+        <If condition="{{ state.reads_photo() }}">
+          <label for="photo">Photo</label>
+          <input id="photo" class="field" type="file" accept="image/*">
+          <span id="photo-description" class="muted">{{ state.photo_description() }}</span>
+
+          <If condition="{{ state.is_depth() }}">
+            <fieldset>
+              <legend>Longest side the model sees</legend>
+              <div class="choices">
+                <ForEach items="{{ state.max_sides() }}" key="{{ |side| side.id.clone() }}">
+                  <label class="choice"><input type="radio" name="max-side" value="{{ item.get().id }}" bind="state.max_side.clone()"><span><strong>{{ item.get().label }}</strong></span></label>
+                </ForEach>
+              </div>
+            </fieldset>
+          </If>
+
+          <If condition="{{ state.is_upscale() }}">
+            <fieldset>
+              <legend>The photo is shrunk to fit this before it is enlarged four times</legend>
+              <div class="choices">
+                <ForEach items="{{ state.budgets() }}" key="{{ |budget| budget.id.clone() }}">
+                  <label class="choice"><input type="radio" name="budget" value="{{ item.get().id }}" bind="state.budget.clone()"><span><strong>{{ item.get().label }}</strong></span></label>
+                </ForEach>
+              </div>
+            </fieldset>
+          </If>
+        </If>
+
+        <div class="row">
+          <button id="generate" type="button" class="control primary" disabled="{{ !state.can_generate() }}" on:click="state.generate()">{{ state.generate_label() }}</button>
+          <button id="stop" type="button" class="control" disabled="{{ !state.can_stop() }}" on:click="state.stop()">Stop</button>
+          <span id="status" class="muted" aria-live="polite">{{ state.status.get() }}</span>
+        </div>
+      </section>
+
+      <If condition="{{ state.measured.get() }}">
+        <section class="card live" data-done="{{ state.image.get().is_some() }}">
+          <div class="pictures">
+            <If condition="{{ state.reads_photo() }}">
+              <div class="frame" style="{{ state.aspect() }}">
+                <canvas id="source" aria-label="The photo"></canvas>
+              </div>
+            </If>
+            <div class="frame" style="{{ state.aspect() }}">
+              <canvas id="picture" aria-label="The image, as it forms"></canvas>
+            </div>
+          </div>
+          <progress id="steps-done" max="{{ state.metrics.get().steps.max(1) }}" value="{{ state.metrics.get().step }}"></progress>
+          <Match value="{{ state.image.get() }}">
+            <Case pattern="Some(url)">
+              <div class="row">
+                <a id="download" class="control" download="{{ state.image_name() }}" href="{{ url.get() }}">Download PNG</a>
+              </div>
+            </Case>
+            <Case pattern="None"></Case>
+          </Match>
+          <dl class="metrics">
+            <div><dt>Time</dt><dd id="time">{{ state.metrics.get().time() }}</dd><dd class="muted">{{ state.metrics.get().compute() }}</dd></div>
+            <div><dt>Per step</dt><dd id="per-step">{{ state.metrics.get().per_step() }}</dd><dd class="muted">{{ state.step_unit() }}</dd></div>
+            <div><dt>Steps</dt><dd id="steps-count">{{ state.metrics.get().steps() }}</dd><dd class="muted">{{ state.steps_note() }}</dd></div>
+            <div><dt>Size</dt><dd id="size">{{ state.metrics.get().size() }}</dd><dd class="muted">pixels</dd></div>
+            <div><dt>Network</dt><dd id="requests">{{ state.metrics.get().requests() }}</dd><dd class="muted">requests since the model loaded</dd></div>
+          </dl>
+        </section>
+      </If>
+
+      <footer class="muted">
+        <span id="runtime">{{ state.summary() }}</span>
+        <span>Built with <a href="https://github.com/fusor-rs/fusor-ai">fusor-ai</a> and <a href="https://fusor.build">fusor</a> · models: <a href="https://huggingface.co/speridlabs/iris-3b">Iris-3B</a> by speridlabs and <a href="https://huggingface.co/Qwen/Qwen3-VL-4B-Instruct">Qwen3-VL-4B-Instruct</a> by Qwen (both Apache-2.0) · <a href="https://github.com/fusor-rs/iris-wasm">source</a></span>
+      </footer>
+    </main>
+  </App>
+</body>
+</html>

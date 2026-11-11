@@ -1,0 +1,44 @@
+<!doctype html>
+<!--
+  The README banner: fusor-ai × Iris-3B. Rendered at 1280×400, twice the pixels, by
+  `node scripts/render-images.mjs` into banner.png and banner-dark.png (`?theme=dark`).
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  :root { --canvas: #faf9f6; --ink: #272a2c; --soft: #5c5f61; --hairline: #e3e0d9; }
+  :root.dark { --canvas: #121314; --ink: #f2f1ed; --soft: #b4b5b3; --hairline: #303335; }
+  html, body { margin: 0; }
+  body {
+    width: 1280px; height: 400px; display: flex; align-items: center; justify-content: center;
+    background: var(--canvas); color: var(--ink);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .banner { display: flex; align-items: center; gap: 40px; }
+  .marks { display: flex; align-items: center; gap: 20px; padding-right: 40px; border-right: 1px solid var(--hairline); }
+  .marks img { height: 84px; }
+  .frame { width: 280px; height: 280px; flex: none; border-radius: 16px; }
+  .times { font-size: 44px; color: var(--soft); font-weight: 300; }
+  h1 { margin: 0; font-size: 50px; letter-spacing: -0.03em; font-weight: 700; line-height: 1; }
+  p { margin: 16px 0 0; font-size: 22px; color: var(--soft); line-height: 1.35; }
+</style>
+</head>
+<body>
+  <div class="banner">
+    <div class="marks">
+      <img src="../../vendor/fusor-ai/assets/brand/fusor-ai.svg" alt="fusor-ai">
+      <span class="times">×</span>
+      <img src="iris.svg" alt="Iris-3B">
+    </div>
+    <div>
+      <h1>iris</h1>
+      <p>Iris-3B in your browser:<br>images, depth and restoration<br>on the CPU, with fusor-ai.</p>
+    </div>
+    <img class="frame" src="frame.png" alt="An image Turbo drew with the CLI from the model card's prompt">
+  </div>
+  <script>
+    if (new URLSearchParams(location.search).get('theme') === 'dark') document.documentElement.classList.add('dark');
+  </script>
+</body>
+</html>
